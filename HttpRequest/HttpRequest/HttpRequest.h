@@ -22,10 +22,7 @@ typedef void (*RequestFinishedCallback)(void *);
 - (void)start;
 - (void)cancel;
 
-@property (assign) void *responseContext;
-@property (assign) void *downloadContext;
-@property (assign) void *requestFailedContext;
-@property (assign) void *requestFinishedContext;
+@property (assign) void *context;
 @property (assign) ResponseCallback responseCallback;
 @property (assign) DownloadPorgressCallback downloadProgressCallback;
 @property (assign) RequestFailedCallback requestFailedCallback;

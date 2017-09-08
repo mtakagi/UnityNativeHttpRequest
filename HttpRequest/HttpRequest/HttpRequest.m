@@ -9,6 +9,9 @@
 #import "HttpRequest.h"
 
 @implementation HttpRequest
+{
+    BOOL _isCanceled;
+}
 
 static NSOperationQueue * _gQueue;
 
@@ -16,6 +19,7 @@ static NSOperationQueue * _gQueue;
 {
     _gQueue = [[NSOperationQueue alloc] init];
     _gQueue.maxConcurrentOperationCount = [[NSProcessInfo processInfo] processorCount] * 5;
+    _gQueue.name = @"com.0xabadbabe.HttpRequest";
 }
 
 - (instancetype)initWithURL:(NSString *)url
@@ -25,6 +29,7 @@ static NSOperationQueue * _gQueue;
         NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:url]];
         _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
         [_connection setDelegateQueue:_gQueue];
+        _isCanceled = NO;
     }
     
     return self;
@@ -43,6 +48,7 @@ static NSOperationQueue * _gQueue;
 - (void)cancel
 {
     [_connection cancel];
+    _isCanceled = YES;
 }
 
 #pragma mark - Delegate
@@ -71,8 +77,8 @@ static NSOperationQueue * _gQueue;
 - (void)connection:(NSURLConnection *)connection
     didReceiveData:(NSData *)data
 {
-    if (self.downloadProgressCallback) {
-        self.downloadProgressCallback(self.downloadContext, [data bytes], [data length]);
+    if (self.downloadProgressCallback && !_isCanceled) {
+        self.downloadProgressCallback(self.context, [data bytes], [data length]);
     }
 }
 
@@ -85,7 +91,7 @@ didReceiveResponse:(NSURLResponse *)response
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
     if (self.requestFinishedCallback) {
-        self.requestFinishedCallback(self.requestFinishedContext);
+        self.requestFinishedCallback(self.context);
     }
 }
 

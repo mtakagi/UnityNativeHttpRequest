@@ -10,28 +10,24 @@
 #import "HttpRequest.h"
 
 extern "C" {
-    void * HttpRequest_Create(const char *, void *, ResponseCallback,
-                              void *, DownloadPorgressCallback,
-                              void *, RequestFailedCallback,
-                              void *, RequestFinishedCallback);
+    void * HttpRequest_Create(const char *, void *, ResponseCallback, DownloadPorgressCallback,
+                              RequestFailedCallback,RequestFinishedCallback);
     void HttpRequest_Start(void * request);
     void HttpRequest_Cancel(void * request);
     void HttpRequest_Dispose(void * request);
 }
 
-void * HttpRequest_Create(const char * url, void *responseContext, ResponseCallback responseCallback,
-                          void *downloadContext, DownloadPorgressCallback downloadProgressCallback,
-                          void *requestFailedContext, RequestFailedCallback requestFailedCallback,
-                          void *requestFinishedContext, RequestFinishedCallback requestFinishedCallback) {
+void * HttpRequest_Create(const char * url, void *context,
+                          ResponseCallback responseCallback,
+                          DownloadPorgressCallback downloadProgressCallback,
+                          RequestFailedCallback requestFailedCallback,
+                          RequestFinishedCallback requestFinishedCallback) {
     HttpRequest *request = [[HttpRequest alloc] initWithURL:[NSString stringWithCString:url
                                                                                encoding:NSUTF8StringEncoding]];
-    request.responseContext = responseContext;
+    request.context = context;
     request.responseCallback = responseCallback;
-    request.downloadContext = downloadContext;
     request.downloadProgressCallback = downloadProgressCallback;
-    request.requestFailedContext = requestFailedContext;
     request.requestFailedCallback = requestFailedCallback;
-    request.requestFinishedContext = requestFinishedContext;
     request.requestFinishedCallback = requestFinishedCallback;
 
     return (void *)request;

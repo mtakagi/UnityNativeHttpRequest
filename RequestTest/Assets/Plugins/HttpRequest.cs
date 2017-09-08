@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class HttpRequest : IDisposable
 {
@@ -7,14 +10,18 @@ public class HttpRequest : IDisposable
     private delegate void DownloadPorgressCallback(IntPtr context, IntPtr data, long length);
     private delegate void RequestFailedCallback(IntPtr context);
     private delegate void RequestFinishedCallback(IntPtr context);
-    
+
+#if UNITY_EDITOR_OSX
     private const string DllName = "HttpRequest";
+#elif UNITY_IOS && !UNITY_EDITOR
+    private const string DllName = "__Internal";
+#endif
 
     [DllImport(DllName)]
-    private static extern IntPtr HttpRequest_Create(string url, IntPtr responseContext, ResponseCallback responseCallback,
-        IntPtr downloadContext, DownloadPorgressCallback downloadProgressCallback,
-        IntPtr requestFailedContext, RequestFailedCallback requestFailedCallback,
-        IntPtr requestFinishedContext, RequestFinishedCallback requestFinishedCallback);
+    private static extern IntPtr HttpRequest_Create(string url, IntPtr context, ResponseCallback responseCallback,
+        DownloadPorgressCallback downloadProgressCallback,
+        RequestFailedCallback requestFailedCallback,
+        RequestFinishedCallback requestFinishedCallback);
     
     [DllImport(DllName)]
     private static extern void HttpRequest_Start(IntPtr request);
@@ -25,79 +32,35 @@ public class HttpRequest : IDisposable
     [DllImport(DllName)]
     private static extern void HttpRequest_Dispose(IntPtr request);
 
-#if UNITY_IOS && !UNITY_EDITOR
-    [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
-    private static void Response(IntPtr context)
-    {
-        
-    }
-    
-    [AOT.MonoPInvokeCallback(typeof(DownloadPorgressCallback))]
-    private static void DownloadProgress(IntPtr context, IntPtr data, long length)
-    {
-        var handle = GCHandle.FromIntPtr(context);
-        var callback = (Action<byte[]>) handle.Target;
-        var dataArray = new byte[length];
-        
-        Marshal.Copy(data, dataArray, 0, (int)length);
-        callback(dataArray);
-    }
-
-    [AOT.MonoPInvokeCallback(typeof(RequestFailedCallback))]
-    private static void RequestFailed(IntPtr context)
-    {
-        
-    }
-    
-    [AOT.MonoPInvokeCallback(typeof(RequestFinishedCallback))]
-    private static void RequestFinished(IntPtr context)
-    {
-        var handle = GCHandle.FromIntPtr(context);
-        var callback = (Action) handle.Target;
-        
-        callback();
-    }
-#endif
-
     private IntPtr _request;
     private string _url;
     private bool _isProgress;
+    private byte[] _buffer;
+    private GCHandle _this;
 
     public event Action<byte[]> onDownloadProgress;
     public event Action onRequestFinished;
 
-    public HttpRequest(string url)
+    public HttpRequest(string url, byte[] buffer)
     {
         _url = url;
+        _buffer = buffer;
         Init(url);
+#if UNITY_EDITOR
+        EditorApplication.playmodeStateChanged += OnPlayModeChanged;
+#endif
+    }
+    
+    public HttpRequest(string url) : this(url, new byte[1024 * 4])
+    {
     }
 
-#if UNITY_IOS && !UNITY_EDITOR
     private void Init(string url)
     {
-        var downloadHandle = GCHandle.Alloc((Action<byte[]>)OnDownloadProgress, GCHandleType.Normal);
-        var downloadPtr = GCHandle.ToIntPtr(downloadHandle);
-        var finishHandle = GCHandle.Alloc((Action) OnRequestFinished, GCHandleType.Normal);
-        var finishPtr = GCHandle.ToIntPtr(finishHandle);
-        _request = HttpRequest_Create(url, IntPtr.Zero, null, downloadPtr, DownloadProgress, IntPtr.Zero, null, finishPtr, RequestFinished);
-        downloadHandle.Free();
-        finishHandle.Free();
+        _this = GCHandle.Alloc(this, GCHandleType.Normal);
+        var ptr = GCHandle.ToIntPtr(_this);
+        _request = HttpRequest_Create(url, ptr, null,  Download, null, Finish);
     }
-#else
-    private void Init(string url)
-    {
-        _request = HttpRequest_Create(url, IntPtr.Zero, null, 
-            IntPtr.Zero, (context, data, length) =>
-            {
-                var dataArray = new byte[length];
-        
-                Marshal.Copy(data, dataArray, 0, (int)length);
-                OnDownloadProgress(dataArray);
-            }, 
-            IntPtr.Zero, null,
-            IntPtr.Zero, context => OnRequestFinished());
-    }
-#endif
 
     public void Start()
     {
@@ -141,6 +104,64 @@ public class HttpRequest : IDisposable
         {
             HttpRequest_Dispose(_request);
             _request = IntPtr.Zero;
+            _this.Free();
         }
     }
+    
+#if UNITY_IOS && !UNITY_EDITOR
+    [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
+#endif
+    private static void Download(IntPtr context, IntPtr data, long length)
+    {
+        try
+        {
+            var handle = GCHandle.FromIntPtr(context);
+            var request = (HttpRequest)handle.Target;
+            var buffer = request._buffer;
+            while (length > 0)
+            {
+                if (data == IntPtr.Zero) break;
+                if (buffer == null || buffer.Length > length)
+                {
+                    buffer = new byte[length];
+                }
+                Marshal.Copy(data, buffer, 0, buffer.Length);
+                request.OnDownloadProgress(buffer);
+                data = new IntPtr(data.ToInt64() + buffer.Length);
+                length -= buffer.Length;
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogException(e);
+        }
+    }
+    
+#if UNITY_IOS && !UNITY_EDITOR
+    [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
+#endif
+    private static void Finish(IntPtr context)
+    {
+        try
+        {
+            var handle = GCHandle.FromIntPtr(context);
+            var request = (HttpRequest)handle.Target;
+            request.OnRequestFinished();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogException(e);
+        }
+    }
+    
+#if UNITY_EDITOR
+    private void OnPlayModeChanged()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            Cancel();
+            Dispose();                                
+        }
+    }
+#endif
 }
