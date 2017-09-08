@@ -1,0 +1,12 @@
+Library/
+obj/
+Temp/
+
+*.csproj
+*.sln
+*.userprefs
+
+.DS_Store
+.idea/
+
+xcuserdata/
