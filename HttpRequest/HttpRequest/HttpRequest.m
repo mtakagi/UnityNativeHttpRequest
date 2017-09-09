@@ -85,7 +85,23 @@ static NSOperationQueue * _gQueue;
 - (void)connection:(NSURLConnection *)connection
 didReceiveResponse:(NSURLResponse *)response
 {
-    
+    if (self.responseCallback && !_isCanceled) {
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        NSInteger statusCode = httpResponse.statusCode;
+        NSDictionary *headers = httpResponse.allHeaderFields;
+        NSString *statusString = [NSHTTPURLResponse localizedStringForStatusCode:statusCode];
+        const char *keys[headers.count];
+        const char *values[headers.count];
+        int i = 0;
+        
+        for (NSString *key in headers) {
+            NSString *value = [headers objectForKey:key];
+            keys[i] = [key UTF8String];
+            values[i] = [value UTF8String];
+            i++;
+        }
+        self.responseCallback(self.context, statusCode, [statusString UTF8String], (int)headers.count, keys, values);
+    }
 }
 
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection

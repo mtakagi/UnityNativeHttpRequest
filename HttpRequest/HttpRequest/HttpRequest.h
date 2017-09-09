@@ -8,7 +8,7 @@
 
 #import <Foundation/Foundation.h>
 
-typedef void (*ResponseCallback)(void *);
+typedef void (*ResponseCallback)(void *, NSInteger, const char *, const int,const char *keys[], const char *values[]);
 typedef void (*DownloadPorgressCallback)(void *, const void *, const NSUInteger length);
 typedef void (*RequestFailedCallback)(void *);
 typedef void (*RequestFinishedCallback)(void *);

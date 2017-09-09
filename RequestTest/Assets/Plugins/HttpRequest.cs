@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -6,12 +7,26 @@ using UnityEditor;
 
 public class HttpRequest : IDisposable
 {
-    private delegate void ResponseCallback(IntPtr context);
+    public class HttpResponse
+    {
+        public int StatusCode { get; private set; }
+        public string StatusString { get; private set; }
+        public Dictionary<string, string> Heaader { get; private set; }
+
+        public HttpResponse(int statusCode, string statusString, Dictionary<string, string> header)
+        {
+            StatusCode = statusCode;
+            StatusString = statusString;
+            Heaader = header;
+        }
+    }
+    
+    private delegate void ResponseCallback(IntPtr context, long statusCode, string statusString, int headerCount, IntPtr keys, IntPtr values);
     private delegate void DownloadPorgressCallback(IntPtr context, IntPtr data, long length);
     private delegate void RequestFailedCallback(IntPtr context);
     private delegate void RequestFinishedCallback(IntPtr context);
 
-#if UNITY_EDITOR_OSX
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
     private const string DllName = "HttpRequest";
 #elif UNITY_IOS && !UNITY_EDITOR
     private const string DllName = "__Internal";
@@ -33,17 +48,19 @@ public class HttpRequest : IDisposable
     private static extern void HttpRequest_Dispose(IntPtr request);
 
     private IntPtr _request;
-    private string _url;
     private bool _isProgress;
     private byte[] _buffer;
     private GCHandle _this;
+
+    public string Url { get; private set; }
+    public HttpResponse Response { get; private set; }
 
     public event Action<byte[]> onDownloadProgress;
     public event Action onRequestFinished;
 
     public HttpRequest(string url, byte[] buffer)
     {
-        _url = url;
+        Url = url;
         _buffer = buffer;
         Init(url);
 #if UNITY_EDITOR
@@ -59,7 +76,7 @@ public class HttpRequest : IDisposable
     {
         _this = GCHandle.Alloc(this, GCHandleType.Normal);
         var ptr = GCHandle.ToIntPtr(_this);
-        _request = HttpRequest_Create(url, ptr, null,  Download, null, Finish);
+        _request = HttpRequest_Create(url, ptr, ResponseDelegate,  Download, null, Finish);
     }
 
     public void Start()
@@ -108,7 +125,34 @@ public class HttpRequest : IDisposable
         }
     }
     
-#if UNITY_IOS && !UNITY_EDITOR
+#if (UNITY_IOS || UNITY_STANDALONE_OSX) && !UNITY_EDITOR
+    [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
+#endif
+    private static void ResponseDelegate(IntPtr context, long statusCode, string statusString, int headerCount, IntPtr keys, IntPtr values)
+    {
+        try
+        {
+            var handle = GCHandle.FromIntPtr(context);
+            var request = (HttpRequest) handle.Target;
+            var keyArray = PtrToStringArray(headerCount, keys);
+            var valueArray = PtrToStringArray(headerCount, values);
+            var header = new Dictionary<string, string>(headerCount);
+
+            for (var i = 0; i < headerCount; i++)
+            {
+                header[keyArray[i]] = valueArray[i];
+            }
+            
+            request.Response = new HttpResponse((int)statusCode, statusString, header);
+        }
+        catch (System.Exception e)
+        {
+            
+        }
+    }
+    
+    
+#if (UNITY_IOS || UNITY_STANDALONE_OSX) && !UNITY_EDITOR
     [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
 #endif
     private static void Download(IntPtr context, IntPtr data, long length)
@@ -133,11 +177,10 @@ public class HttpRequest : IDisposable
         }
         catch (System.Exception e)
         {
-            Debug.LogException(e);
         }
     }
     
-#if UNITY_IOS && !UNITY_EDITOR
+#if (UNITY_IOS || UNITY_STANDALONE_OSX) && !UNITY_EDITOR
     [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
 #endif
     private static void Finish(IntPtr context)
@@ -150,9 +193,35 @@ public class HttpRequest : IDisposable
         }
         catch (System.Exception e)
         {
-            Debug.LogException(e);
         }
     }
+    
+    private static string PtrToString (IntPtr p)
+    {
+        // TODO: deal with character set issues.  Will PtrToStringAnsi always
+        // "Do The Right Thing"?
+        if (p == IntPtr.Zero)
+            return null;
+        return Marshal.PtrToStringAnsi (p);
+    }
+ 
+    private static string[] PtrToStringArray (int count, IntPtr stringArray)
+    {
+        if (count < 0)
+            throw new ArgumentOutOfRangeException ("count", "< 0");
+        if (stringArray == IntPtr.Zero)
+            return new string[count];
+ 
+ 
+        var members = new string[count];
+        for (var i = 0; i < count; ++i) {
+            var s = Marshal.ReadIntPtr (stringArray, i * IntPtr.Size);
+            members[i] = PtrToString (s);
+        }
+ 
+        return members;
+    }
+
     
 #if UNITY_EDITOR
     private void OnPlayModeChanged()
