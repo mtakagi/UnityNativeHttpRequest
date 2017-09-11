@@ -76,7 +76,7 @@ public class HttpRequest : IDisposable
     {
         _this = GCHandle.Alloc(this, GCHandleType.Normal);
         var ptr = GCHandle.ToIntPtr(_this);
-        _request = HttpRequest_Create(url, ptr, ResponseDelegate,  Download, null, Finish);
+        _request = HttpRequest_Create(url, ptr, ResponseDelegate,  DownloadDelegate, null, FinishDelegate);
     }
 
     public void Start()
@@ -153,9 +153,9 @@ public class HttpRequest : IDisposable
     
     
 #if (UNITY_IOS || UNITY_STANDALONE_OSX) && !UNITY_EDITOR
-    [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
+    [AOT.MonoPInvokeCallback(typeof(DownloadPorgressCallback))]
 #endif
-    private static void Download(IntPtr context, IntPtr data, long length)
+    private static void DownloadDelegate(IntPtr context, IntPtr data, long length)
     {
         try
         {
@@ -181,9 +181,9 @@ public class HttpRequest : IDisposable
     }
     
 #if (UNITY_IOS || UNITY_STANDALONE_OSX) && !UNITY_EDITOR
-    [AOT.MonoPInvokeCallback(typeof(ResponseCallback))]
+    [AOT.MonoPInvokeCallback(typeof(RequestFinishedCallback))]
 #endif
-    private static void Finish(IntPtr context)
+    private static void FinishDelegate(IntPtr context)
     {
         try
         {
