@@ -13,11 +13,12 @@ typedef void (*DownloadPorgressCallback)(void *, const void *, const NSUInteger 
 typedef void (*RequestFailedCallback)(void *);
 typedef void (*RequestFinishedCallback)(void *);
 
-@interface HttpRequest : NSObject
+@interface HttpClient : NSObject
 {
     NSURLConnection * _connection;
 }
 
+- (instancetype)initWithRequest:(NSURLRequest *)request;
 - (instancetype)initWithURL:(NSString *)url;
 - (void)start;
 - (void)cancel;

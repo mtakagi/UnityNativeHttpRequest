@@ -12,19 +12,21 @@ public class Test : MonoBehaviour
 	// Use this for initialization
 	void Start () {
 		Debug.Log(GetThredInfo());
-		var request = new HttpRequest("https://httpbin.org/stream/100");
-		request.onDownloadProgress += bytes =>
+		var request = new HttpRequest("https://httpbin.org/post", HttpRequest.HttpMethod.POST);
+		request.SetHttpBody(Encoding.UTF8.GetBytes("fuck"));
+		var client = new HttpClient(request);
+		client.onDownloadProgress += bytes =>
 		{
 			Debug.Log(GetThredInfo());
 			data.AddRange(bytes);
 		};
-		request.onRequestFinished += () =>
+		client.onRequestFinished += () =>
 		{
 			Debug.Log(GetThredInfo());
 			Debug.Log(Encoding.UTF8.GetString(data.ToArray()));
-			request.Dispose();
+			client.Dispose();
 		};
-		request.Start();
+		client.Start();
 	}
 
 	private string GetThredInfo()

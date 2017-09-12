@@ -6,9 +6,9 @@
 //  Copyright © 2017年 mtakagi. All rights reserved.
 //
 
-#import "HttpRequest.h"
+#import "HttpClient.h"
 
-@implementation HttpRequest
+@implementation HttpClient
 {
     BOOL _isCanceled;
 }
@@ -22,17 +22,21 @@ static NSOperationQueue * _gQueue;
     _gQueue.name = @"com.0xabadbabe.HttpRequest";
 }
 
-- (instancetype)initWithURL:(NSString *)url
+- (instancetype)initWithRequest:(NSURLRequest *)request
 {
     self = [super init];
     if (self) {
-        NSURLRequest *request = [NSURLRequest requestWithURL:[NSURL URLWithString:url]];
         _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
         [_connection setDelegateQueue:_gQueue];
         _isCanceled = NO;
     }
     
     return self;
+}
+
+- (instancetype)initWithURL:(NSString *)url
+{
+    return [self initWithRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:url]]];
 }
 
 - (void)dealloc {
