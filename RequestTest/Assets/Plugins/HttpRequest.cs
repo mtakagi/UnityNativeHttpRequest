@@ -6,6 +6,7 @@ public class HttpRequest : IDisposable {
 
     public enum HttpMethod
     {
+        // ReSharper disable InconsistentNaming
         GET = 0,
         HEAD,
         POST,
@@ -13,6 +14,7 @@ public class HttpRequest : IDisposable {
         PUT,
         DELETE,
         TRACE
+        // ReSharper restore InconsistentNaming
     }
 
     private static readonly string[] HttpMethods = {"GET", "HEAD", "POST", "OPTIONS", "PUT", "DELETE", "TRACE"};
@@ -39,7 +41,9 @@ public class HttpRequest : IDisposable {
     public string Url { get; private set; }
     public Dictionary<string, string> Headers { get; private set; }
     
-    internal readonly IntPtr Request;
+    internal IntPtr Request;
+
+    private bool _isDisposed;
     
     public HttpRequest(string url)
     {
@@ -87,9 +91,29 @@ public class HttpRequest : IDisposable {
     
     public void Dispose()
     {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool isDisposing)
+    {
+        if (_isDisposed) return;
+        if (isDisposing)
+        {
+            Url = null;
+            Headers = null;
+        }
+            
         if (Request != IntPtr.Zero)
         {
             HttpRequest_Release(Request);
+            Request = IntPtr.Zero;
         }
+        _isDisposed = true;
+    }
+
+    ~HttpRequest()
+    {
+        Dispose(false);
     }
 }

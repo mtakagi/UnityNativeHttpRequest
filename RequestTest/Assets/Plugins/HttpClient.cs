@@ -57,6 +57,7 @@ public class HttpClient : IDisposable
     private bool _isProgress;
     private byte[] _buffer;
     private GCHandle _this;
+    private bool _isDisposed;
 
     public string Url { get; private set; }
     public HttpResponse Response { get; private set; }
@@ -145,12 +146,33 @@ public class HttpClient : IDisposable
 
     public void Dispose()
     {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool isDisposing)
+    {
+        if (_isDisposed) return;
+
+        if (isDisposing)
+        {
+            _buffer = null;
+            Url = null;
+            Response = null;
+        }
+
         if (_request != IntPtr.Zero)
         {
             HttpClient_Dispose(_request);
             _request = IntPtr.Zero;
             _this.Free();
         }
+        _isDisposed = true;
+    }
+
+    ~HttpClient()
+    {
+        Dispose(false);
     }
     
 #if (UNITY_IOS || UNITY_STANDALONE_OSX) && !UNITY_EDITOR
