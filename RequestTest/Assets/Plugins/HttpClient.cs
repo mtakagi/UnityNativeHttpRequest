@@ -221,7 +221,13 @@ public class HttpClient : IDisposable
                 }
                 Marshal.Copy(data, buffer, 0, buffer.Length);
                 request.OnDownloadProgress(buffer);
-                data = new IntPtr(data.ToInt64() + buffer.Length);
+#if NET_4_6
+				data = IntPtr.Add(data, buffer.Length);
+#else
+				unsafe {
+					data =  (IntPtr) (unchecked (((byte *) data) + buffer.Length));
+				}
+#endif
                 length -= buffer.Length;
             }
         }
